@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Vendor {
+  id                String         @id @default(uuid())
+  name              String
+  vendorType        String // Mapped from enum
+  category          String // Mapped from enum
+  contactPerson     String
+  phone             String
+  email             String
+  operatingLocation String
+  rating            Decimal
+  safetyRating      Decimal
+  currentStatus     String   @default("ACTIVE") // Mapped from enum
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  documents         VendorDocument[]
+  workRequirements  WorkRequirement[]
+  recommendations   RecommendationResult[]
+}
+
+model VendorDocument {
+  id             String         @id @default(uuid())
+  vendorId       String
+  documentType   String // Mapped from enum
+  documentNumber String
+  issuedDate     DateTime?
+  expiryDate     DateTime?
+  status         String // Mapped from enum
+
+  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, documentType])
+}
+
+model WorkRequirement {
+  id                String            @id @default(uuid())
+  title             String
+  category          String // Mapped from enum
+  location          String
+  estimatedValue    Decimal
+  priority          String // Mapped from enum
+  expectedStartDate DateTime
+  status            String @default("OPEN") // Mapped from enum
+  assignedVendorId  String?
+  assignedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  assignedVendor    Vendor?           @relation(fields: [assignedVendorId], references: [id])
+  recommendationRuns RecommendationRun[]
+}
+
+model RecommendationRun {
+  id                String                 @id @default(uuid())
+  workRequirementId String
+  generatedAt       DateTime               @default(now())
+  aiSummary         String?
+
+  workRequirement   WorkRequirement        @relation(fields: [workRequirementId], references: [id])
+  results           RecommendationResult[]
+}
+
+model RecommendationResult {
+  id                     String            @id @default(uuid())
+  recommendationRunId    String
+  vendorId               String
+  eligible               Boolean
+  disqualificationReason String?
+  totalScore             Decimal?
+  scoreBreakdown         String?
+  rank                   Int?
+
+  run                    RecommendationRun @relation(fields: [recommendationRunId], references: [id])
+  vendor                 Vendor            @relation(fields: [vendorId], references: [id])
+}
