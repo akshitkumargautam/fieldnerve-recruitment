@@ -36,5 +36,42 @@
 1. **SQLite over PostgreSQL:** Due to constrained local environments in the sandbox, SQLite was favored to guarantee the application works end-to-end flawlessly locally without external DB connection issues. 
 2. **Single Skills & Locations:** Exact match on strings for Categories and Locations. Vendors are assumed to have a single region of operation.
 3. **No Auth:** Left out per instruction scope.
-4. **No History:** `VendorDocument` enforces one record per `documentType`. Document renewals overwrite the existing row.
 5. **Score Determinism:** Fallbacks sort eligible vendors by totalScore, then safetyRating, then alphabetically by name to avoid non-deterministic rankings in tests.
+
+## 7. How to Test
+
+### Setup
+1. Open a terminal in this `v1` folder:
+   ```bash
+   cd v1
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Push the Prisma schema to create the local SQLite database (`dev.db`):
+   ```bash
+   npx prisma db push
+   ```
+4. Generate the Prisma Client:
+   ```bash
+   npx prisma generate
+   ```
+5. Seed the database with exact vendors and work requirements from the specification:
+   ```bash
+   npm run seed
+   ```
+
+### Running the Server
+Start the development server (runs on `http://localhost:3000`):
+```bash
+npm run dev
+```
+*(Note: Ensure you leave this terminal open while testing the API)*
+
+### API Testing (Postman)
+1. Open **Postman**.
+2. Import the collection provided at: `postman/fieldnerve.postman_collection.json`.
+3. Open the imported **FieldNerve** collection.
+4. Run the requests manually or use the **Collection Runner** to run them top-to-bottom sequentially. 
+   - *Note: The requests utilize environment variables (like `vendorId` and `workReqId`) which are automatically set during the collection run via test scripts.*
