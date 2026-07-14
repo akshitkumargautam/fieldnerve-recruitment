@@ -1,8 +1,8 @@
 # FieldNerve Vendor Recommendation Platform v1 — Complete Test Results
 
-**Date**: 2026-07-14  
-**Status**: ✅ **ALL TESTS PASSED**  
-**Bugs Found & Fixed**: 1 (Zod error handler)  
+**Date**: 2026-07-14
+**Status**: ✅ **ALL TESTS PASSED**
+**Bugs Found & Fixed**: 1 (Zod error handler)
 
 ---
 
@@ -15,12 +15,14 @@ The v1 implementation has been thoroughly tested and **all core functionality is
 ## Test Results
 
 ### ✅ Test 1: Server Initialization
+
 - Status: **PASS**
 - Server starts without errors
 - Port 3000 listening
 - Health endpoint responds: `GET /health → 200 OK`
 
 ### ✅ Test 2: Database Setup
+
 - Status: **PASS**
 - SQLite database created successfully
 - Prisma schema applied cleanly
@@ -28,6 +30,7 @@ The v1 implementation has been thoroughly tested and **all core functionality is
 - All foreign keys and constraints enforced
 
 ### ✅ Test 3: Vendor Management (CRUD)
+
 - Status: **PASS**
 - `GET /vendors` → returns all 12 vendors
 - All vendor fields present and correct:
@@ -37,6 +40,7 @@ The v1 implementation has been thoroughly tested and **all core functionality is
   - PowerGrid Systems (near-expiry document)
 
 ### ✅ Test 4: Work Requirements (CRUD)
+
 - Status: **PASS**
 - `GET /work-requirements` → returns all 4 requirements
 - All fields present: title, category, location, priority, status, etc.
@@ -45,26 +49,28 @@ The v1 implementation has been thoroughly tested and **all core functionality is
 
 **Spec Worked Example Verification:**
 
-| Vendor | Component | Expected | Actual | Match |
-|--------|-----------|----------|--------|-------|
-| Apex Civil Works | totalScore | 93.5 | 93.5 | ✅ |
-| Apex Civil Works | ratingScore | 0.9 | 0.9 | ✅ |
-| Apex Civil Works | safetyScore | 0.8 | 0.8 | ✅ |
-| Apex Civil Works | complianceScore | 1.0 | 1.0 | ✅ |
-| Apex Civil Works | locationScore | 1.0 | 1.0 | ✅ |
-| Deccan Structures | totalScore | 68.6 | 68.6 | ✅ |
-| Deccan Structures | ratingScore | 0.96 | 0.96 | ✅ |
-| Deccan Structures | safetyScore | 0.98 | 0.98 | ✅ |
-| Deccan Structures | complianceScore | 1.0 | 1.0 | ✅ |
-| Deccan Structures | locationScore | 0.0 | 0.0 | ✅ |
+| Vendor            | Component       | Expected | Actual | Match |
+| ----------------- | --------------- | -------- | ------ | ----- |
+| Apex Civil Works  | totalScore      | 93.5     | 93.5   | ✅    |
+| Apex Civil Works  | ratingScore     | 0.9      | 0.9    | ✅    |
+| Apex Civil Works  | safetyScore     | 0.8      | 0.8    | ✅    |
+| Apex Civil Works  | complianceScore | 1.0      | 1.0    | ✅    |
+| Apex Civil Works  | locationScore   | 1.0      | 1.0    | ✅    |
+| Deccan Structures | totalScore      | 68.6     | 68.6   | ✅    |
+| Deccan Structures | ratingScore     | 0.96     | 0.96   | ✅    |
+| Deccan Structures | safetyScore     | 0.98     | 0.98   | ✅    |
+| Deccan Structures | complianceScore | 1.0      | 1.0    | ✅    |
+| Deccan Structures | locationScore   | 0.0      | 0.0    | ✅    |
 
 **Formula Verification:**
+
 ```
 Apex: (0.9*0.25 + 0.8*0.20 + 1.0*0.25 + 1.0*0.30)*100 = 93.5 ✅
 Deccan: (0.96*0.25 + 0.98*0.20 + 1.0*0.25 + 0.0*0.30)*100 = 68.6 ✅
 ```
 
 **Disqualifications:**
+
 - ✅ Bharat Infra Builders: "TRADE_LICENSE is expired"
 - ✅ Other non-matching: "Category mismatch"
 
@@ -74,17 +80,19 @@ Deccan: (0.96*0.25 + 0.98*0.20 + 1.0*0.25 + 0.0*0.30)*100 = 68.6 ✅
 
 **Weight Shift Verification:**
 
-| Vendor | MEDIUM | CRITICAL | Gap Change |
-|--------|--------|----------|-----------|
-| Apex | 93.5 | 90.5 | -3.0 ✅ |
-| Deccan | 68.6 | 83.3 | +14.7 ✅ |
-| Gap | 24.9 | 6.6 | Narrowed ✅ |
+| Vendor | MEDIUM | CRITICAL | Gap Change  |
+| ------ | ------ | -------- | ----------- |
+| Apex   | 93.5   | 90.5     | -3.0 ✅     |
+| Deccan | 68.6   | 83.3     | +14.7 ✅    |
+| Gap    | 24.9   | 6.6      | Narrowed ✅ |
 
 **Weight Changes:**
+
 - Safety: 0.20 → 0.35 (+0.15) ✅
 - Location: 0.30 → 0.15 (-0.15) ✅
 
 **Formula Verification:**
+
 ```
 Apex (CRITICAL): (0.9*0.25 + 0.8*0.35 + 1.0*0.25 + 1.0*0.15)*100 = 90.5 ✅
 Deccan (CRITICAL): (0.96*0.25 + 0.98*0.35 + 1.0*0.25 + 0.0*0.15)*100 = 83.3 ✅
@@ -130,6 +138,7 @@ Deccan (CRITICAL): (0.96*0.25 + 0.98*0.35 + 1.0*0.25 + 0.0*0.15)*100 = 83.3 ✅
 - assignedVendorId and assignedAt persisted ✅
 
 **Error Cases:**
+
 - ✅ Cannot assign twice (409 CONFLICT: "Work requirement is not OPEN")
 - ✅ Cannot assign ineligible vendor (409 CONFLICT: "Vendor was not eligible in the latest recommendation run")
 
@@ -158,6 +167,7 @@ Deccan (CRITICAL): (0.96*0.25 + 0.98*0.35 + 1.0*0.25 + 0.0*0.15)*100 = 83.3 ✅
 ## Bug Report
 
 ### Issue #1: Zod Validation Error Handler (FIXED)
+
 - **Severity**: Low (affects error messages during testing, not core logic)
 - **Symptom**: Validation errors for invalid enum values crashed the server (500)
 - **Root Cause**: Error handler assumed `err.errors` array exists on all ZodError instances
@@ -170,25 +180,25 @@ Deccan (CRITICAL): (0.96*0.25 + 0.98*0.35 + 1.0*0.25 + 0.0*0.15)*100 = 83.3 ✅
 
 ## Coverage Summary
 
-| Category | Coverage | Status |
-|----------|----------|--------|
-| API Endpoints | 13/13 | ✅ 100% |
-| Business Logic | 5/5 (filter, score, rank, assign, summarize) | ✅ 100% |
-| Error Cases | 4/4 (404, 409, 400, 500) | ✅ 100% |
-| Edge Cases | 4/4 (single vendor, weight shift, CRITICAL override, near-expiry) | ✅ 100% |
-| Data Persistence | 5/5 | ✅ 100% |
+| Category         | Coverage                                                          | Status  |
+| ---------------- | ----------------------------------------------------------------- | ------- |
+| API Endpoints    | 13/13                                                             | ✅ 100% |
+| Business Logic   | 5/5 (filter, score, rank, assign, summarize)                      | ✅ 100% |
+| Error Cases      | 4/4 (404, 409, 400, 500)                                          | ✅ 100% |
+| Edge Cases       | 4/4 (single vendor, weight shift, CRITICAL override, near-expiry) | ✅ 100% |
+| Data Persistence | 5/5                                                               | ✅ 100% |
 
 ---
 
 ## Numeric Verification (Spec Alignment)
 
-| Scenario | Component | Expected | Actual | Status |
-|----------|-----------|----------|--------|--------|
-| Req A (MEDIUM) | Apex score | 93.5 | 93.5 | ✅ EXACT |
-| Req A (MEDIUM) | Deccan score | 68.6 | 68.6 | ✅ EXACT |
-| Req B (CRITICAL) | Apex score | 90.5 | 90.5 | ✅ EXACT |
-| Req B (CRITICAL) | Deccan score | 83.3 | 83.3 | ✅ EXACT |
-| Req A vs Req B | Gap change | 24.9 → 6.6 | 24.9 → 6.6 | ✅ EXACT |
+| Scenario         | Component    | Expected    | Actual      | Status   |
+| ---------------- | ------------ | ----------- | ----------- | -------- |
+| Req A (MEDIUM)   | Apex score   | 93.5        | 93.5        | ✅ EXACT |
+| Req A (MEDIUM)   | Deccan score | 68.6        | 68.6        | ✅ EXACT |
+| Req B (CRITICAL) | Apex score   | 90.5        | 90.5        | ✅ EXACT |
+| Req B (CRITICAL) | Deccan score | 83.3        | 83.3        | ✅ EXACT |
+| Req A vs Req B   | Gap change   | 24.9 → 6.6 | 24.9 → 6.6 | ✅ EXACT |
 
 ---
 
@@ -217,6 +227,7 @@ Deccan (CRITICAL): (0.96*0.25 + 0.98*0.35 + 1.0*0.25 + 0.0*0.15)*100 = 83.3 ✅
 All verification points from the spec have been tested and pass with exact numeric matches. The system is deterministic, explainable, and handles edge cases correctly.
 
 ### Ready for:
+
 1. ✅ Screen recording walkthrough (demo A-D scenarios)
 2. ✅ Postman collection testing
 3. ✅ Submission with README
