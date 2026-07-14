@@ -1,0 +1,384 @@
+{
+  "info": {
+    "name": "FieldNerve",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Vendor",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"vendorId\", jsonData.data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/vendors",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Test Vendor\",\"vendorType\":\"CONTRACTOR\",\"category\":\"CIVIL_CONSTRUCTION\",\"contactPerson\":\"John Doe\",\"phone\":\"1234567890\",\"email\":\"test@example.com\",\"operatingLocation\":\"Maharashtra\",\"rating\":4,\"safetyRating\":4.5}"
+        }
+      }
+    },
+    {
+      "name": "Get Vendors",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3000/vendors?category=CIVIL_CONSTRUCTION",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors"
+          ],
+          "query": [
+            {
+              "key": "category",
+              "value": "CIVIL_CONSTRUCTION"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Vendor By ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Vendor",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"rating\":4.2}"
+        }
+      }
+    },
+    {
+      "name": "Create Vendor Document",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"docId\", jsonData.data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}/documents",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}",
+            "documents"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"documentType\":\"INSURANCE\",\"documentNumber\":\"INS123\",\"status\":\"VALID\",\"expiryDate\":\"2030-01-01T00:00:00.000Z\"}"
+        }
+      }
+    },
+    {
+      "name": "Get Vendor Documents",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}/documents",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}",
+            "documents"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Vendor Document",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}/documents/{{docId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}",
+            "documents",
+            "{{docId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"status\":\"EXPIRED\"}"
+        }
+      }
+    },
+    {
+      "name": "Create Work Requirement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"workReqId\", jsonData.data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/work-requirements",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"Test Work Requirement\",\"category\":\"CIVIL_CONSTRUCTION\",\"location\":\"Maharashtra\",\"estimatedValue\":1000000,\"priority\":\"HIGH\",\"expectedStartDate\":\"2026-12-01T00:00:00.000Z\"}"
+        }
+      }
+    },
+    {
+      "name": "Get Work Requirements",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3000/work-requirements",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Work Requirement By ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3000/work-requirements/{{workReqId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements",
+            "{{workReqId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Work Requirement",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/work-requirements/{{workReqId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements",
+            "{{workReqId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"estimatedValue\":1200000}"
+        }
+      }
+    },
+    {
+      "name": "Run Recommendations",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/work-requirements/{{workReqId}}/recommendations",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements",
+            "{{workReqId}}",
+            "recommendations"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Recommendations",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3000/work-requirements/{{workReqId}}/recommendations",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements",
+            "{{workReqId}}",
+            "recommendations"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Assign Vendor",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/work-requirements/{{workReqId}}/assign",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "work-requirements",
+            "{{workReqId}}",
+            "assign"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"vendorId\":\"{{vendorId}}\"}"
+        }
+      }
+    },
+    {
+      "name": "Delete Vendor Document",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}/documents/{{docId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}",
+            "documents",
+            "{{docId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Delete Vendor",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "http://localhost:3000/vendors/{{vendorId}}",
+          "host": [
+            "http://localhost:3000"
+          ],
+          "path": [
+            "vendors",
+            "{{vendorId}}"
+          ]
+        }
+      }
+    }
+  ]
+}
