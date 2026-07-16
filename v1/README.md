@@ -45,19 +45,23 @@
    ```bash
    cd v1
    ```
-2. Install dependencies:
+2. Create your local environment file from the template (sets `DATABASE_URL` for the local SQLite database):
+   ```bash
+   cp .env.example .env
+   ```
+3. Install dependencies:
    ```bash
    npm install
    ```
-3. Push the Prisma schema to create the local SQLite database (`dev.db`):
+4. Push the Prisma schema to create the local SQLite database (`dev.db`):
    ```bash
    npx prisma db push
    ```
-4. Generate the Prisma Client:
+5. Generate the Prisma Client:
    ```bash
    npx prisma generate
    ```
-5. Seed the database with exact vendors and work requirements from the specification:
+6. Seed the database with exact vendors and work requirements from the specification:
    ```bash
    npm run seed
    ```
