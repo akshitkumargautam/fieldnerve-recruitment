@@ -28,14 +28,15 @@
 - **Stage 1 (Eligibility):** Evaluates exact case-insensitive matches for `category` and active `VendorStatus`. Checks against a hardcoded list of `mandatoryDocsConfig` for the specific category. If the requirement priority is `CRITICAL`, `SAFETY_CERTIFICATE` is forcibly added to the required docs array. It collects all invalid or missing docs without short-circuiting to provide comprehensive disqualification reasons.
 - **Stage 2 (Scoring):** Calculates 4 normalized factors (Rating, Safety, Compliance, Location). Evaluates the weighted sum dynamically based on `Priority`.
   - For `CRITICAL`/`HIGH`, Safety weight goes up, Location weight goes down.
+  - Location carries deliberately little weight overall (0.10 for LOW/MEDIUM, 0.05 for HIGH/CRITICAL) because it is a coarse binary string match, not a real distance model.
   - Generates a final score rounded to 1 decimal.
 
 ## 5. AI Usage
 
 - Built via the Strategy Pattern using a common `Summarizer` interface.
-- **llmSummarizer**: Uses `process.env.LLM_API_KEY` to format the inputs. (Placeholder implementation in this build).
-- **fallbackSummarizer**: Deterministically builds an explainable sentence reading from the exact same interface data `({rank1.name} ranks #1...)`.
-- **Dependencies:** The RecommendationService does not care which summarizer is injected; it simply fetches it based on the presence of the environment variable.
+- **llmSummarizer**: Real LLM integration over the OpenAI-compatible chat-completions protocol — works with any compatible provider (Gemini by default, or OpenAI, Groq, OpenRouter, Ollama, ...). Configured via `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`.
+- **fallbackSummarizer**: Deterministically builds an explainable summary from the same interface data: the winner and its strongest weighted factors, the runner-up and where it lost ground, the disqualified count, and a compact per-vendor near-expiry clause.
+- **Selection & degradation:** If `LLM_API_KEY` is set the LLM path runs; on any LLM failure (bad key, network, timeout) the request degrades to the fallback instead of erroring. The response's `aiSummarySource` field (`"llm"` or `"fallback"`) shows which engine produced the text.
 
 ## 6. Assumptions & Trade-offs
 

@@ -4,9 +4,20 @@ import { evaluateEligibility } from './filters';
 import { calculateScore } from './scoring';
 import { LLMSummarizer } from '../../ai/llmSummarizer';
 import { FallbackSummarizer } from '../../ai/fallbackSummarizer';
-import { Summarizer, SummarizerInput } from '../../ai/summarizer';
+import { SummarizerInput } from '../../ai/summarizer';
 
-const summarizer: Summarizer = process.env.LLM_API_KEY ? new LLMSummarizer() : new FallbackSummarizer();
+// LLM path is opt-in via LLM_API_KEY; any LLM failure degrades to the
+// deterministic fallback instead of failing the request.
+async function generateSummary(input: SummarizerInput): Promise<{ text: string; source: 'llm' | 'fallback' }> {
+  if (process.env.LLM_API_KEY) {
+    try {
+      return { text: await new LLMSummarizer().summarize(input), source: 'llm' };
+    } catch (err) {
+      console.error('LLM summarization failed, using fallback:', err instanceof Error ? err.message : err);
+    }
+  }
+  return { text: await new FallbackSummarizer().summarize(input), source: 'fallback' };
+}
 
 export class RecommendationService {
   async runRecommendations(workRequirementId: string) {
@@ -14,10 +25,10 @@ export class RecommendationService {
     if (!requirement) throw new AppError('Work requirement not found', 'NOT_FOUND', 404);
 
     const vendors = await prisma.vendor.findMany({ include: { documents: true } });
-    
+
     const results = vendors.map(vendor => {
       const eligibility = evaluateEligibility(vendor, requirement);
-      
+
       if (!eligibility.eligible) {
         return {
           vendorId: vendor.id,
@@ -29,7 +40,7 @@ export class RecommendationService {
           rank: null
         };
       }
-      
+
       const score = calculateScore(vendor, requirement);
       return {
         vendorId: vendor.id,
@@ -42,19 +53,19 @@ export class RecommendationService {
         rank: null
       };
     });
-    
+
     const eligibleResults = results.filter(r => r.eligible) as any[];
-    
+
     eligibleResults.sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
       if (b.safetyRating !== a.safetyRating) return Number(b.safetyRating) - Number(a.safetyRating);
       return a.vendorName.localeCompare(b.vendorName);
     });
-    
+
     eligibleResults.forEach((r, idx) => {
       r.rank = idx + 1;
     });
-    
+
     const allResults = results.map(r => {
       const isEligible = eligibleResults.find(er => er.vendorId === r.vendorId);
       return isEligible || r;
@@ -86,8 +97,8 @@ export class RecommendationService {
       breakdown: r.scoreBreakdown
     }));
 
-    const top5VendorIds = top5.map(t => eligibleResults.find(er => er.vendorName === t.name).vendorId);
-    
+    const top5VendorIds = eligibleResults.slice(0, 5).map(r => r.vendorId);
+
     const now = new Date();
     const plus30 = new Date(now);
     plus30.setDate(now.getDate() + 30);
@@ -110,11 +121,16 @@ export class RecommendationService {
     const summaryInput: SummarizerInput = {
       requirementTitle: requirement.title,
       requirementPriority: requirement.priority,
+      requirementCategory: requirement.category,
+      requirementLocation: requirement.location,
       rankedVendors: top5,
+      ineligibleVendors: allResults
+        .filter(r => !r.eligible)
+        .map(r => ({ name: r.vendorName, reason: r.disqualificationReason ?? 'Unknown' })),
       nearExpiryWarnings
     };
 
-    const aiSummary = await summarizer.summarize(summaryInput);
+    const { text: aiSummary, source: aiSummarySource } = await generateSummary(summaryInput);
 
     await prisma.recommendationRun.update({
       where: { id: run.id },
@@ -125,8 +141,10 @@ export class RecommendationService {
       runId: run.id,
       generatedAt: run.generatedAt,
       aiSummary,
+      aiSummarySource,
       ranked: eligibleResults.slice(0, 5).map(r => ({
         vendorId: r.vendorId,
+        vendorName: r.vendorName,
         eligible: r.eligible,
         disqualificationReason: r.disqualificationReason,
         totalScore: r.totalScore,
@@ -135,6 +153,7 @@ export class RecommendationService {
       })),
       ineligible: allResults.filter(r => !r.eligible).map(r => ({
         vendorId: r.vendorId,
+        vendorName: r.vendorName,
         eligible: r.eligible,
         disqualificationReason: r.disqualificationReason,
         totalScore: r.totalScore,
@@ -148,22 +167,34 @@ export class RecommendationService {
     const runs = await prisma.recommendationRun.findMany({
       where: { workRequirementId },
       orderBy: { generatedAt: 'desc' },
-      include: { results: true },
+      include: { results: { include: { vendor: { select: { name: true } } } } },
       take: all ? undefined : 1
     });
 
     if (runs.length === 0) throw new AppError('No recommendations found', 'NOT_FOUND', 404);
 
+    const toDto = (r: any) => ({
+      id: r.id,
+      recommendationRunId: r.recommendationRunId,
+      vendorId: r.vendorId,
+      vendorName: r.vendor.name,
+      eligible: r.eligible,
+      disqualificationReason: r.disqualificationReason,
+      totalScore: r.totalScore,
+      scoreBreakdown: r.scoreBreakdown ? JSON.parse(r.scoreBreakdown) : null,
+      rank: r.rank
+    });
+
     return runs.map(run => {
       const ranked = run.results.filter((r: any) => r.eligible).sort((a: any, b: any) => a.rank - b.rank).slice(0, 5);
       const ineligible = run.results.filter((r: any) => !r.eligible);
-      
+
       return {
         runId: run.id,
         generatedAt: run.generatedAt,
         aiSummary: run.aiSummary,
-        ranked: ranked.map(r => ({ ...r, scoreBreakdown: r.scoreBreakdown ? JSON.parse(r.scoreBreakdown) : null })),
-        ineligible: ineligible.map(r => ({ ...r, scoreBreakdown: r.scoreBreakdown ? JSON.parse(r.scoreBreakdown) : null }))
+        ranked: ranked.map(toDto),
+        ineligible: ineligible.map(toDto)
       };
     });
   }

@@ -260,12 +260,14 @@ These are combined using **priority-dependent weights**:
 
 | Priority | Rating | Safety | Compliance | Location |
 |---|---|---|---|---|
-| LOW, MEDIUM | 0.25 | 0.20 | 0.25 | **0.30** |
-| HIGH, CRITICAL | 0.25 | **0.35** | 0.25 | 0.15 |
+| LOW, MEDIUM | 0.35 | 0.25 | 0.30 | **0.10** |
+| HIGH, CRITICAL | 0.30 | **0.40** | 0.25 | 0.05 |
 
 **Final score** = `round((ratingScore × w_rating + safetyScore × w_safety + complianceScore × w_compliance + locationScore × w_location) × 100, 1 decimal)`
 
-This weight shift creates meaningful behavior: under `CRITICAL` priority, safety gets more weight and location gets less, allowing a high-quality distant vendor to compete with a mediocre local one.
+Location carries deliberately little weight: it is a binary, exact-string signal (see Assumptions), which is too coarse to justify a large influence on ranking. Until location is modeled properly (structured fields, distance tiers), it acts as a mild local-vendor bonus only.
+
+This weight shift creates meaningful behavior: under `CRITICAL` priority, safety gets more weight and location gets less, allowing a high-quality distant vendor to outrank a good local one.
 
 ### Ranking & Tie-Breaking
 
@@ -282,10 +284,10 @@ For a `CIVIL_CONSTRUCTION` requirement in `Maharashtra`:
 
 | Vendor | Rating | Safety | Docs Valid | Location Match | MEDIUM Score | CRITICAL Score |
 |---|---|---|---|---|---|---|
-| Apex Civil Works | 4.5 | 4.0 | 5/5 | ✅ Maharashtra | **93.5** | **90.5** |
-| Deccan Structures | 4.8 | 4.9 | 5/5 | ❌ Gujarat | **68.6** | **83.3** |
+| Apex Civil Works | 4.5 | 4.0 | 5/5 | ✅ Maharashtra | **91.5** | **89.0** |
+| Deccan Structures | 4.8 | 4.9 | 5/5 | ❌ Gujarat | **88.1** | **93.0** |
 
-Under MEDIUM priority, the gap is 24.9 points. Under CRITICAL, it narrows to 7.2 points — demonstrating that the priority-weight mechanism meaningfully impacts ranking without flipping the winner in this scenario.
+Under MEDIUM priority, Apex wins by 3.4 points on the strength of its location match. Under CRITICAL, **the ranking flips**: safety weight rises to 0.40 and location drops to 0.05, so Deccan's superior safety record (4.9 vs 4.0) outweighs its distance and it takes rank #1 by 4.0 points. The same algorithm produces a different winner depending on business urgency, and every step of that is visible in the persisted score breakdown.
 
 ---
 
@@ -312,13 +314,23 @@ The platform includes an **AI-assisted recommendation summary** feature, impleme
 
 ### Selection Logic
 
-```typescript
-const summarizer = process.env.LLM_API_KEY
-  ? new LLMSummarizer()
-  : new FallbackSummarizer();
+The choice is made **per request**, with graceful degradation:
+
+- If `LLM_API_KEY` is set, the `LLMSummarizer` is used.
+- If it is unset, **or the LLM call fails for any reason** (bad key, network error, timeout), the deterministic `FallbackSummarizer` runs instead — the request never fails because of the LLM.
+- The `POST .../recommendations` response includes `aiSummarySource: "llm" | "fallback"` so it is always visible which engine produced the text.
+
+### LLM Summarizer (Bring Your Own Provider)
+
+The LLM path speaks the OpenAI-compatible chat-completions protocol, so **any compatible provider works** — Gemini (default), OpenAI, Anthropic, Groq, OpenRouter, local Ollama, etc.:
+
+```bash
+LLM_API_KEY="<your key>"                                                  # enables the LLM path
+LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"  # default: Gemini
+LLM_MODEL="gemini-2.5-flash"                                              # default
 ```
 
-This decision is made once at module load, not per-request.
+Swapping providers is two env-var edits, zero code. The model receives the full run result (score breakdowns, disqualification reasons, warnings) and is instructed to explain the ranking in 3–5 plain-language sentences without ever contradicting it — the ranking is computed deterministically first and is final.
 
 ### Input Contract
 
@@ -328,16 +340,19 @@ Both implementations receive identical structured data:
 {
   requirementTitle: string,
   requirementPriority: string,
-  rankedVendors: [{ name, rank, totalScore, breakdown }],  // top 5
-  nearExpiryWarnings: [{ vendorName, documentType, expiryDate }]  // VALID docs expiring within 30 days
+  requirementCategory: string,
+  requirementLocation: string,
+  rankedVendors: [{ name, rank, totalScore, breakdown }],           // top 5
+  ineligibleVendors: [{ name, reason }],                            // disqualified before scoring
+  nearExpiryWarnings: [{ vendorName, documentType, expiryDate }]    // VALID docs expiring within 30 days
 }
 ```
 
 ### Fallback Summarizer (Deterministic)
 
-When no LLM API key is configured, a deterministic template generates human-readable summaries referencing real computed data:
+When no LLM API key is configured (or the LLM call fails), a deterministic template generates a human-readable summary from the real computed data: the winner and the factors that drove its score, the runner-up and where it lost ground, how many vendors were disqualified, and a single compact trailing clause for near-expiry documents (aggregated per vendor, so it never dominates the summary):
 
-- Output example: `"Apex Civil Works ranks #1 with a score of 93.5. Note: PowerGrid Systems's SAFETY_CERTIFICATE expires on 2026-08-03."`
+- Output example: `"Deccan Structures ranks #1 for Emergency Bridge Repair (CRITICAL priority) with a score of 93, driven mainly by safety record and overall rating. Apex Civil Works follows at 89, 4 points behind, losing ground mostly on safety record. 10 vendor(s) were disqualified during eligibility checks before scoring."`
 
 This ensures the AI feature is always functional and explainable, even without external API dependencies.
 
@@ -446,4 +461,6 @@ curl -X POST http://localhost:3000/work-requirements/<id>/recommendations
 |---|---|---|
 | `DATABASE_URL` | Yes | Database connection string (default: `file:./dev.db`) |
 | `PORT` | No | Server port (default: `3000`) |
-| `LLM_API_KEY` | No | If set, enables LLM-backed AI summaries; otherwise uses deterministic fallback |
+| `LLM_API_KEY` | No | If set, enables LLM-backed AI summaries (falls back to the deterministic summarizer on any LLM error) |
+| `LLM_BASE_URL` | No | OpenAI-compatible endpoint of any provider (default: Gemini's `https://generativelanguage.googleapis.com/v1beta/openai/`) |
+| `LLM_MODEL` | No | Model name at the chosen provider (default: `gemini-2.5-flash`) |

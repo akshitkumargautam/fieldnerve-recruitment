@@ -1,26 +1,38 @@
 import { prisma } from '../../db/prismaClient';
 import { AppError } from '../../shared/errors';
 
+const assignedVendorInclude = { assignedVendor: { select: { name: true } } } as const;
+
+// Responses expose a flat assignedVendorName next to assignedVendorId so
+// consumers never need a second lookup to display who was assigned.
+function toDto(req: any) {
+  const { assignedVendor, ...rest } = req;
+  return { ...rest, assignedVendorName: assignedVendor?.name ?? null };
+}
+
 export class WorkRequirementService {
   async createWorkRequirement(data: any) {
-    return prisma.workRequirement.create({ data });
+    const req = await prisma.workRequirement.create({ data, include: assignedVendorInclude });
+    return toDto(req);
   }
 
   async getWorkRequirements(filters: any) {
-    return prisma.workRequirement.findMany({ where: filters });
+    const reqs = await prisma.workRequirement.findMany({ where: filters, include: assignedVendorInclude });
+    return reqs.map(toDto);
   }
 
   async getWorkRequirementById(id: string) {
-    const req = await prisma.workRequirement.findUnique({ where: { id } });
+    const req = await prisma.workRequirement.findUnique({ where: { id }, include: assignedVendorInclude });
     if (!req) throw new AppError('Work requirement not found', 'NOT_FOUND', 404);
-    return req;
+    return toDto(req);
   }
 
   async updateWorkRequirement(id: string, data: any) {
     const req = await prisma.workRequirement.findUnique({ where: { id } });
     if (!req) throw new AppError('Work requirement not found', 'NOT_FOUND', 404);
-    
-    return prisma.workRequirement.update({ where: { id }, data });
+
+    const updated = await prisma.workRequirement.update({ where: { id }, data, include: assignedVendorInclude });
+    return toDto(updated);
   }
 
   async assignVendor(id: string, vendorId: string) {
@@ -47,13 +59,15 @@ export class WorkRequirementService {
       throw new AppError('Vendor was not eligible in the latest recommendation run', 'CONFLICT', 409);
     }
 
-    return prisma.workRequirement.update({
+    const updated = await prisma.workRequirement.update({
       where: { id },
       data: {
         status: 'ASSIGNED',
         assignedVendorId: vendorId,
         assignedAt: new Date()
-      }
+      },
+      include: assignedVendorInclude
     });
+    return toDto(updated);
   }
 }
