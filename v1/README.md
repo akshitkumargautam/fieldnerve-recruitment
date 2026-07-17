@@ -53,7 +53,7 @@
    ```bash
    cd v1
    ```
-2. Create your local environment file from the template (sets `DATABASE_URL` for the local SQLite database):
+2. Create your local environment file from the template (sets `DATABASE_URL` for the local SQLite database; optionally uncomment `LLM_API_KEY` there to enable LLM-generated summaries - any OpenAI-compatible provider key works, Gemini by default):
    ```bash
    cp .env.example .env
    ```
@@ -71,8 +71,9 @@
    ```
 6. Seed the database with exact vendors and work requirements from the specification:
    ```bash
-   npm run seed
+   npx tsx prisma/seed.ts
    ```
+   *(Use `tsx`, not `npm run seed` - the `ts-node` runner behind that script is incompatible with the project's TypeScript version.)*
 
 ### Running the Server
 

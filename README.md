@@ -8,7 +8,7 @@ An internal backend platform that helps operations teams maintain vendor/contrac
 
 1. [Project Architecture](#1-project-architecture)
 2. [Database Design](#2-database-design)
-3. [API Design](#3-api-design)
+3. [API Endpoints](#3-api-endpoints)
 4. [Recommendation Logic](#4-recommendation-logic)
 5. [AI Usage](#5-ai-usage)
 6. [Assumptions](#6-assumptions)
@@ -175,9 +175,11 @@ Since SQLite does not support native enums, enum values are stored as strings an
 
 ---
 
-## 3. API Design
+## 3. API Endpoints
 
-All endpoints follow RESTful conventions with consistent response envelopes.
+All endpoints follow RESTful conventions. Base URL: `http://localhost:3000`. Every request body is JSON (`Content-Type: application/json`) and validated with Zod - an invalid or missing field returns `400 VALIDATION_ERROR` naming the offending field. Success responses are wrapped in `{ "data": ... }`, errors in `{ "error": { "message", "code" } }`.
+
+The tables below list every endpoint, and for each `POST`/`PATCH`, exactly which body fields exist, which values they accept, and what they actually do in the system - so any request can be populated without reading the source.
 
 ### Vendor Endpoints
 
@@ -186,8 +188,39 @@ All endpoints follow RESTful conventions with consistent response envelopes.
 | `POST` | `/vendors` | Create a new vendor | 201 |
 | `GET` | `/vendors` | List vendors (filter by `category`, `vendorType`, `currentStatus`, `operatingLocation`) | 200 |
 | `GET` | `/vendors/:id` | Get vendor by ID (includes nested `documents`) | 200 / 404 |
-| `PATCH` | `/vendors/:id` | Update vendor fields | 200 / 404 |
+| `PATCH` | `/vendors/:id` | Update vendor fields (any subset of the create fields) | 200 / 404 |
 | `DELETE` | `/vendors/:id` | Delete vendor (cascades to documents) | 204 / 404 |
+
+**Body fields for `POST /vendors`** (PATCH accepts any subset of the same):
+
+| Field | Required | Type / allowed values | What it does |
+|---|---|---|---|
+| `name` | Yes | string | Display name. Returned as `vendorName` everywhere the vendor appears in other responses. |
+| `vendorType` | Yes | `CONTRACTOR` \| `SUBCONTRACTOR` \| `EQUIPMENT_RENTAL` \| `MATERIAL_SUPPLIER` \| `INSPECTION_AGENCY` \| `CONSULTANT` | Kind of business. Descriptive only - no effect on eligibility or scoring. |
+| `category` | Yes | `CIVIL_CONSTRUCTION` \| `ELECTRICAL_INSTRUMENTATION` \| `MECHANICAL_FABRICATION` \| `LOGISTICS_EQUIPMENT` \| `HSE_COMPLIANCE_TESTING` | Work domain. Hard eligibility gate: the vendor is only considered for requirements in the same category. |
+| `contactPerson` | Yes | string | Contact info, no business logic. |
+| `phone` | Yes | string | Contact info, no business logic. |
+| `email` | Yes | valid email string | Contact info, validated format. |
+| `operatingLocation` | Yes | string (e.g. `"Maharashtra"`) | Home region. Compared case-insensitively against a requirement's `location` for the location score (1.0 exact match, else 0.0). Deliberately low weight in scoring. |
+| `rating` | Yes | number 0-5 | Overall performance. Weighted 0.35 (LOW/MEDIUM) or 0.30 (HIGH/CRITICAL) in scoring. |
+| `safetyRating` | Yes | number 0-5 | Safety record. Weighted 0.25 (LOW/MEDIUM) or 0.40 (HIGH/CRITICAL) - heaviest factor on urgent jobs. Also the ranking tie-breaker. |
+| `currentStatus` | No (default `ACTIVE`) | `ACTIVE` \| `INACTIVE` \| `SUSPENDED` \| `BLACKLISTED` | Compliance gate: any value other than `ACTIVE` disqualifies the vendor from every recommendation run regardless of scores. |
+
+Example body:
+
+```json
+{
+  "name": "Sunrise Constructions",
+  "vendorType": "CONTRACTOR",
+  "category": "CIVIL_CONSTRUCTION",
+  "contactPerson": "R. Sharma",
+  "phone": "+91-9800000000",
+  "email": "contact@sunrise.example.com",
+  "operatingLocation": "Maharashtra",
+  "rating": 4.2,
+  "safetyRating": 4.6
+}
+```
 
 ### Vendor Document Endpoints
 
@@ -195,8 +228,32 @@ All endpoints follow RESTful conventions with consistent response envelopes.
 |---|---|---|---|
 | `POST` | `/vendors/:id/documents` | Add a document to a vendor | 201 / 409 |
 | `GET` | `/vendors/:id/documents` | List all documents for a vendor | 200 |
-| `PATCH` | `/vendors/:id/documents/:docId` | Update a document | 200 / 404 |
+| `PATCH` | `/vendors/:id/documents/:docId` | Update a document (all fields except `documentType`) | 200 / 404 |
 | `DELETE` | `/vendors/:id/documents/:docId` | Remove a document | 204 / 404 |
+
+**Body fields for `POST /vendors/:id/documents`:**
+
+| Field | Required | Type / allowed values | What it does |
+|---|---|---|---|
+| `documentType` | Yes | `TAX_REGISTRATION` \| `INSURANCE` \| `TRADE_LICENSE` \| `SAFETY_CERTIFICATE` \| `AGREEMENT` | One of five compliance document types. A vendor can hold at most ONE of each type - posting a duplicate type returns `409 CONFLICT`. |
+| `documentNumber` | Yes | string | Reference number, metadata only. |
+| `issuedDate` | No | ISO date string (`"2025-01-15"`) | Informational. |
+| `expiryDate` | No | ISO date string | Drives two behaviors: an expired mandatory document disqualifies the vendor, and a `VALID` document expiring within 30 days triggers the near-expiry warning in the AI summary. |
+| `status` | Yes | `VALID` \| `EXPIRED` \| `PENDING_VERIFICATION` | Only `VALID` documents count toward the compliance score (valid docs / 5) and satisfy mandatory-document checks. |
+
+Which document types are *mandatory* depends on the requirement's `category` (see `mandatoryDocs.config.ts`); a `CRITICAL`-priority requirement additionally forces `SAFETY_CERTIFICATE` into the required list.
+
+Example body:
+
+```json
+{
+  "documentType": "SAFETY_CERTIFICATE",
+  "documentNumber": "SC-2026-0042",
+  "issuedDate": "2026-01-10",
+  "expiryDate": "2027-01-10",
+  "status": "VALID"
+}
+```
 
 ### Work Requirement Endpoints
 
@@ -205,15 +262,61 @@ All endpoints follow RESTful conventions with consistent response envelopes.
 | `POST` | `/work-requirements` | Create a work requirement (defaults to `OPEN`) | 201 |
 | `GET` | `/work-requirements` | List requirements (filter by `status`, `category`, `priority`) | 200 |
 | `GET` | `/work-requirements/:id` | Get requirement by ID | 200 / 404 |
-| `PATCH` | `/work-requirements/:id` | Update requirement fields | 200 / 404 |
+| `PATCH` | `/work-requirements/:id` | Update requirement fields (any subset of the create fields) | 200 / 404 |
 | `POST` | `/work-requirements/:id/assign` | Assign a vendor to the requirement | 200 / 409 |
+
+All work-requirement responses include `assignedVendorName` alongside `assignedVendorId` (both `null` while unassigned).
+
+**Body fields for `POST /work-requirements`:**
+
+| Field | Required | Type / allowed values | What it does |
+|---|---|---|---|
+| `title` | Yes | string | Job name. Fed to the AI summary so it can anchor its explanation ("for the emergency bridge repair..."). |
+| `category` | Yes | same five values as vendor `category` | Only vendors in this exact category are eligible. |
+| `location` | Yes | string | Where the work is. Matched against vendor `operatingLocation` for the location score. |
+| `estimatedValue` | Yes | positive number | Budget / contract value. Stored and returned, but not used by the recommendation engine. |
+| `priority` | Yes | `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` | Selects the scoring weight profile (safety 0.25 → 0.40 and location 0.10 → 0.05 as priority rises) and, at `CRITICAL`, adds `SAFETY_CERTIFICATE` to the mandatory documents. |
+| `expectedStartDate` | Yes | ISO date string | When work should begin. Informational. |
+
+Example body:
+
+```json
+{
+  "title": "Warehouse Foundation Repair",
+  "category": "CIVIL_CONSTRUCTION",
+  "location": "Maharashtra",
+  "estimatedValue": 2500000,
+  "priority": "HIGH",
+  "expectedStartDate": "2026-09-01"
+}
+```
+
+**Body for `POST /work-requirements/:id/assign`:**
+
+```json
+{ "vendorId": "<uuid of the vendor>" }
+```
+
+Assignment enforces three business rules, each returning `409 CONFLICT` if violated: the requirement must still be `OPEN` (no double assignment), a recommendation run must already exist for it, and the vendor must have been **eligible in the latest run**. On success the requirement flips to `ASSIGNED` with `assignedVendorId`, `assignedVendorName`, and `assignedAt` populated.
 
 ### Recommendation Endpoints
 
 | Method | Path | Description | Status |
 |---|---|---|---|
-| `POST` | `/work-requirements/:id/recommendations` | Run recommendation engine against all vendors | 201 |
-| `GET` | `/work-requirements/:id/recommendations` | Get latest recommendation (or all with `?all=true`) | 200 / 404 |
+| `POST` | `/work-requirements/:id/recommendations` | Run recommendation engine against all vendors (no body) | 201 |
+| `GET` | `/work-requirements/:id/recommendations` | Get latest persisted run (or all runs with `?all=true`) | 200 / 404 |
+
+`POST` takes no body - just fire it at a requirement's id. The response contains:
+
+| Response field | What it is |
+|---|---|
+| `runId`, `generatedAt` | Identity and timestamp of this persisted run. |
+| `aiSummary` | Plain-language explanation of the result. |
+| `aiSummarySource` | `"llm"` if an LLM wrote it, `"fallback"` if the deterministic template did (also the automatic result whenever the LLM call fails). |
+| `ranked` | Top 5 eligible vendors: `vendorId`, `vendorName`, `totalScore`, `rank`, and the full `scoreBreakdown` (all four normalized factors plus the exact weights used). |
+| `ineligible` | Every disqualified vendor with `vendorName` and a human-readable `disqualificationReason`. |
+
+`GET` returns the same shape from the database (vendor names included); it returns `404` until at least one run has been triggered.
 
 ---
 
@@ -327,7 +430,7 @@ The LLM path speaks the OpenAI-compatible chat-completions protocol, so **any co
 ```bash
 LLM_API_KEY="<your key>"                                                  # enables the LLM path
 LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"  # default: Gemini
-LLM_MODEL="gemini-2.5-flash"                                              # default
+LLM_MODEL="gemini-flash-latest"                                              # default
 ```
 
 Swapping providers is two env-var edits, zero code. The model receives the full run result (score breakdowns, disqualification reasons, warnings) and is instructed to explain the ranking in 3–5 plain-language sentences without ever contradicting it — the ranking is computed deterministically first and is final.
@@ -463,4 +566,4 @@ curl -X POST http://localhost:3000/work-requirements/<id>/recommendations
 | `PORT` | No | Server port (default: `3000`) |
 | `LLM_API_KEY` | No | If set, enables LLM-backed AI summaries (falls back to the deterministic summarizer on any LLM error) |
 | `LLM_BASE_URL` | No | OpenAI-compatible endpoint of any provider (default: Gemini's `https://generativelanguage.googleapis.com/v1beta/openai/`) |
-| `LLM_MODEL` | No | Model name at the chosen provider (default: `gemini-2.5-flash`) |
+| `LLM_MODEL` | No | Model name at the chosen provider (default: `gemini-flash-latest`) |
