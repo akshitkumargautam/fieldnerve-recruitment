@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { errorHandler } from './shared/errors';
 import { vendorRoutes } from './modules/vendors/vendor.routes';

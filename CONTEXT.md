@@ -60,7 +60,7 @@ substantially better, because speed/quality > proximity when downtime costs mone
 
 ### IMPLEMENTATION_SPEC.md
 The executable spec. Anyone (human or LLM) can implement from this without guessing. Sections:
-1. **Global conventions**: stack (Express/Prisma/Postgres/zod), ID types, error envelopes, folder structure.
+1. **Global conventions**: stack (Express/Prisma/SQLite/zod), ID types, error envelopes, folder structure.
 2. **Data model**: exact Prisma schema (Vendor, VendorDocument, WorkRequirement, RecommendationRun, RecommendationResult).
 3. **Business rules**: eligibility algorithm, scoring formula with worked numeric examples, assignment rules.
 4. **API contract**: every endpoint, request/response shapes, status codes.
@@ -160,7 +160,8 @@ disqualification reason if not, total score and per-factor breakdown if eligible
 2. **Follow the phases in Section 7** — build Phase 0 (scaffold) → Phase 1 (schema) → Phase 2 (seed)
    → ... → Phase 9 (README + recording). Each phase only depends on earlier phases.
 3. **Use Section 3.4 (worked example) to verify** — when Phase 5 is done, POST to recommendations for
-   requirement A and confirm you get Apex at 93.5 and Deccan at 68.6. Exact numbers.
+   requirement A and confirm you get Apex at 91.5 and Deccan at 88.1. Exact numbers. (On requirement B,
+   CRITICAL priority, the ranking flips: Deccan 93.0 over Apex 89.0.)
 4. **Reference PLANNING.md if you want reasoning** — why location is scoring-only, why status is explicit,
    why these weights, etc.
 
@@ -180,11 +181,11 @@ disqualification reason if not, total score and per-factor breakdown if eligible
 
 - **Language**: Node.js 20+, TypeScript (strict mode)
 - **Framework**: Express (lightweight, no DI overhead for a single-dev 4-5 hour build)
-- **Database**: PostgreSQL (Neon for free provisioning + no deployment step needed)
+- **Database**: SQLite (local file via Prisma — zero provisioning, fully self-contained repo)
 - **ORM**: Prisma (fast schema + type-safe client + excellent seed support)
 - **Validation**: zod (declarative, colocated with routes)
 - **Config**: dotenv (.env files, no build-time config)
-- **AI**: LLM provider agnostic (Anthropic/OpenAI/etc. if API key present; fallback to deterministic template)
+- **AI**: LLM provider agnostic via the OpenAI-compatible protocol (Gemini default; any compatible provider via `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL`); graceful fallback to a deterministic template on missing key or LLM failure, with `aiSummarySource` exposing which engine ran
 
 ---
 
