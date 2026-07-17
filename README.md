@@ -63,7 +63,7 @@ v1/
 │       └── asyncHandler.ts      # Express async wrapper to catch promise rejections
 ├── postman/
 │   └── fieldnerve.postman_collection.json  # Full API test collection
-├── .env                         # DATABASE_URL for local SQLite
+├── .env.example                 # Template for .env (DATABASE_URL for local SQLite)
 └── package.json
 ```
 
@@ -511,6 +511,13 @@ The system automatically flags any `VALID` document among the top 5 ranked vendo
 ```bash
 cd v1
 npm install
+```
+
+### Environment Setup
+
+```bash
+# Create your local .env from the template (sets DATABASE_URL for the local SQLite database)
+cp .env.example .env
 ```
 
 ### Database Setup
